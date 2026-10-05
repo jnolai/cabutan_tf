@@ -53,7 +53,7 @@
         CABUTAN NO.FAIL
       </h1>
       <p id="statusText" class="text-slate-400 text-xs sm:text-sm mt-1 font-medium">
-        Pilih mod cabutan dan tekan butang untuk memulakan sesi
+        Tekan butang CABUTAN untuk memulakan sesi
       </p>
     </div>
 
@@ -102,27 +102,11 @@
 
     </div>
 
-    <!-- Tombol Pemilihan -->
-    <div class="flex flex-col sm:flex-row gap-4 mb-8 w-full max-w-xl relative z-30">
-      <button id="btnDraw1" onclick="handleButtonClick(1)" class="flex-1 py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-base sm:text-lg rounded-2xl shadow-xl shadow-amber-500/20 active:scale-95 transition-all cursor-pointer">
-        Cabut 1 Fail Sahaja
+    <!-- Butang CABUTAN Utama -->
+    <div class="flex flex-col gap-4 mb-4 w-full max-w-xl relative z-30">
+      <button id="btnDraw" onclick="handleDrawClick()" class="w-full py-5 bg-gradient-to-r from-amber-500 via-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xl sm:text-2xl rounded-2xl shadow-xl shadow-amber-500/20 active:scale-95 transition-all cursor-pointer">
+        CABUTAN
       </button>
-
-      <button id="btnDraw5" onclick="handleButtonClick(5)" class="flex-1 py-4 bg-gradient-to-r from-red-600 via-amber-500 to-amber-600 hover:from-red-500 hover:to-amber-400 text-slate-950 font-black text-base sm:text-lg rounded-2xl shadow-xl shadow-red-500/20 active:scale-95 transition-all cursor-pointer">
-        Cabut 5 Fail Sekaligus
-      </button>
-    </div>
-
-    <!-- Senarai Pemenang Sesi Semasa -->
-    <div class="w-full relative z-20">
-      <div class="flex items-center justify-between mb-3 px-1">
-        <h3 class="text-xs uppercase tracking-wider font-bold text-slate-400">Senarai Pemenang Sesi Semasa</h3>
-        <span id="sessionCounter" class="text-xs font-mono text-amber-400">0 / 0 Pemenang</span>
-      </div>
-
-      <div id="winnersContainer" class="w-full space-y-3">
-        <!-- Kotak Banner Horizontal Dinamis -->
-      </div>
     </div>
 
   </div>
@@ -131,18 +115,18 @@
     const SPREADSHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1MUMz7nyfsWFFg9DUkQC6D19EJ7-DweFgHUa98-67Qxs/gviz/tq?tqx=out:csv';
 
     let fileRecords = [];
-    const fileMap = new Map(); // Kamus Carian Lajur A (Folder) -> Lajur B (URL)
+    const fileMap = new Map();
     const drawnWinnersSet = new Set();
     let isDrawing = false;
     let audioCtx = null;
     let currentActiveFolderUrl = '';
 
-    function handleButtonClick(count) {
+    function handleDrawClick() {
       if (fileRecords.length === 0) {
         alert("Pangkalan data Google Sheets sedang dimuatkan. Sila cuba sebentar lagi.");
         return;
       }
-      startDrawFlow(count);
+      startDrawFlow();
     }
 
     function openSelectedFolder() {
@@ -153,7 +137,7 @@
       }
     }
 
-    // Muat data Google Sheets dan bina Kamus Carian Padanan Tepat
+    // Muat data Google Sheets
     async function loadGoogleSheetsData() {
       const badge = document.getElementById('sheetStatusBadge');
       try {
@@ -174,7 +158,6 @@
               const folderName = String(row[0]).trim();
               const linkUrl = String(row[1]).trim().replace(/[\r\n\t]/g, '');
 
-              // Abaikan header tajuk "Nama Folder"
               if (folderName && folderName.toLowerCase() !== 'nama folder' && linkUrl.length > 0) {
                 fileRecords.push(folderName);
                 fileMap.set(folderName, linkUrl);
@@ -184,9 +167,6 @@
             if (fileRecords.length > 0) {
               badge.innerText = `Pangkalan Data: ${fileRecords.length.toLocaleString()} Rekod Fail Disambung (Google Sheets)`;
               badge.className = "px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
-            } else {
-              badge.innerText = "Pangkalan Data Kosong atau Gagal Dibaca";
-              badge.className = "px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase bg-red-500/10 text-red-400 border border-red-500/30";
             }
           }
         });
@@ -331,74 +311,22 @@
       } catch (e) {}
     }
 
-    function startDrawFlow(count) {
+    function startDrawFlow() {
       if (isDrawing || fileRecords.length === 0) return;
       isDrawing = true;
 
-      const btn1 = document.getElementById('btnDraw1');
-      const btn5 = document.getElementById('btnDraw5');
-      const container = document.getElementById('winnersContainer');
-      const counter = document.getElementById('sessionCounter');
+      const btnDraw = document.getElementById('btnDraw');
+      btnDraw.disabled = true;
+      btnDraw.classList.add('opacity-50', 'cursor-not-allowed');
 
-      btn1.disabled = true;
-      btn5.disabled = true;
-      btn1.classList.add('opacity-50', 'cursor-not-allowed');
-      btn5.classList.add('opacity-50', 'cursor-not-allowed');
-
-      container.innerHTML = '';
-
-      for (let i = 1; i <= count; i++) {
-        const card = document.createElement('div');
-        card.id = `slotCard_${i}`;
-        card.className = "w-full bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 transition-all duration-300 shadow-md";
-        card.innerHTML = `
-          <div class="flex items-center gap-3 sm:gap-4 w-full md:w-auto justify-between md:justify-start">
-            <span class="px-3 py-1.5 bg-slate-800 text-slate-400 font-bold text-xs uppercase tracking-wider rounded-xl border border-slate-700 whitespace-nowrap">
-              PEMENANG #${i}
-            </span>
-            <div class="file-slot text-base sm:text-xl font-mono font-bold text-slate-600 tracking-wider">
-              MENUNGGU...
-            </div>
-          </div>
-          
-          <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-            <div class="flex flex-col md:items-end items-start text-left md:text-right">
-              <div class="name-slot text-sm sm:text-base font-bold text-slate-500">FAIL DISAHKAN</div>
-              <div class="status-slot text-xs font-mono text-slate-600 mt-0.5">Sedia untuk dibuka</div>
-            </div>
-            <button id="cardBtn_${i}" class="hidden px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-semibold transition-all cursor-pointer">
-              Buka Folder
-            </button>
-          </div>
-        `;
-        container.appendChild(card);
-      }
-
-      function runNextSlot(currentSlot) {
-        if (currentSlot > count) {
-          counter.innerText = `${count} / ${count} Selesai Disahkan!`;
-          btn1.disabled = false;
-          btn5.disabled = false;
-          btn1.classList.remove('opacity-50', 'cursor-not-allowed');
-          btn5.classList.remove('opacity-50', 'cursor-not-allowed');
-          isDrawing = false;
-          return;
-        }
-
-        counter.innerText = `${currentSlot} / ${count} Sedang Dicabut`;
-        executeSuspenseDrawForSlot(currentSlot, count, () => {
-          if (currentSlot < count) {
-            setTimeout(() => runNextSlot(currentSlot + 1), 1200);
-          } else {
-            runNextSlot(currentSlot + 1);
-          }
-        });
-      }
-
-      runNextSlot(1);
+      executeSuspenseDrawForSlot(() => {
+        btnDraw.disabled = false;
+        btnDraw.classList.remove('opacity-50', 'cursor-not-allowed');
+        isDrawing = false;
+      });
     }
 
-    function executeSuspenseDrawForSlot(slotIndex, totalInBatch, onComplete) {
+    function executeSuspenseDrawForSlot(onComplete) {
       const board = document.getElementById('boardContainer');
       const overlay = document.getElementById('suspenseOverlay');
       const slotBadge = document.getElementById('slotBadge');
@@ -407,17 +335,12 @@
       const winnerNameEl = document.getElementById('currentWinnerName');
       const winnerFileNoEl = document.getElementById('currentWinnerFileNo');
       const mainLinkInput = document.getElementById('mainLinkInput');
-      const card = document.getElementById(`slotCard_${slotIndex}`);
 
-      slotBadge.innerText = `Sedang Mencabut: Pemenang ${slotIndex} daripada ${totalInBatch}`;
-      statusText.innerText = `Menyaring pangkalan data Google Sheets bagi Pemenang #${slotIndex}...`;
+      slotBadge.innerText = `Sedang Mencabut No. Fail`;
+      statusText.innerText = `Menyaring pangkalan data Google Sheets...`;
       winnerBox.classList.add('opacity-0');
       board.classList.add('heartbeat-box', 'border-red-500/80');
       overlay.classList.add('opacity-100');
-
-      if (card) {
-        card.classList.add('border-amber-500', 'bg-amber-500/10', 'scale-[1.01]');
-      }
 
       let selectedIndex;
       let attempts = 0;
@@ -430,9 +353,7 @@
       drawnWinnersSet.add(selectedIndex);
 
       const targetFileNo = fileRecords[selectedIndex];
-      // Cari URL sebenar dari Lajur B berasaskan nama fail
       const targetUrl = fileMap.get(targetFileNo) || '';
-      
       const targetChars = targetFileNo.padEnd(5, ' ').split('');
 
       startDrone(7.5);
@@ -549,28 +470,14 @@
             winnerNameEl.innerText = `FAIL ${targetFileNo}`;
             winnerFileNoEl.innerText = targetFileNo;
             
-            // Masukkan pautan URL tepat dari Lajur B Google Sheets bagi No Fail ini
             currentActiveFolderUrl = targetUrl;
             mainLinkInput.value = targetUrl;
             
             winnerBox.classList.remove('opacity-0');
 
-            if (card) {
-              card.classList.remove('border-amber-500', 'bg-amber-500/10', 'scale-[1.01]');
-              card.classList.add('border-emerald-500/60', 'bg-slate-900');
-              
-              const cEl = card.querySelector('.file-slot');
-              cEl.innerText = targetFileNo;
-              cEl.className = "file-slot text-base sm:text-xl font-mono font-bold text-amber-400 tracking-wider";
-
-              const cardBtn = document.getElementById(`cardBtn_${slotIndex}`);
-              cardBtn.onclick = () => window.open(targetUrl, '_blank');
-              cardBtn.classList.remove('hidden');
-            }
-
             playWinnerAudio();
             confetti({ 
-              particleCount: (slotIndex === totalInBatch && totalInBatch === 5) ? 180 : 80, 
+              particleCount: 100, 
               spread: 70, 
               origin: { y: 0.65 } 
             });
