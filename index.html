@@ -8,6 +8,8 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Library CSV Parser -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <!-- Library QR Code Generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     @keyframes heartbeat {
       0%, 100% { transform: scale(1); }
@@ -77,9 +79,9 @@
         <div id="d4" class="bg-slate-950 border border-slate-800 text-amber-400 w-12 h-16 sm:w-16 sm:h-22 text-2xl sm:text-4xl rounded-xl flex items-center justify-center shadow-inner transition-transform duration-300">0</div>
       </div>
 
-      <!-- Paparan Profil Pemenang & Pautan Kongsian Utama -->
-      <div id="currentWinnerBox" class="opacity-0 transition-all duration-300 mt-6 pt-5 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-around gap-4">
-        <div class="text-center sm:text-left">
+      <!-- Paparan Profil Pemenang, Pautan & QR Code -->
+      <div id="currentWinnerBox" class="opacity-0 transition-all duration-300 mt-6 pt-5 border-t border-slate-800 flex flex-col md:flex-row items-center justify-around gap-6">
+        <div class="text-center md:text-left">
           <span class="text-xs uppercase tracking-widest text-emerald-400 font-bold block mb-1">Fail Sah Disahkan</span>
           <h2 id="currentWinnerName" class="text-xl sm:text-2xl font-black text-white tracking-wide">--</h2>
           
@@ -89,14 +91,20 @@
           </div>
         </div>
 
-        <!-- Paparan Butang Pautan Utama -->
-        <div class="flex flex-col items-center justify-center bg-slate-950/80 p-4 rounded-2xl border border-slate-800 w-full sm:w-auto gap-2">
-          <button id="mainFolderBtn" onclick="openSelectedFolder()" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer z-30">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-            Buka Folder Fail
-          </button>
-          
-          <input id="mainLinkInput" type="text" readonly onclick="this.select()" class="bg-slate-900 text-[11px] text-slate-300 font-mono px-3 py-1.5 rounded-lg border border-slate-700/80 w-full max-w-[260px] text-center select-all cursor-pointer" value="--">
+        <!-- Bahagian Butang Pautan & Kotak QR Code -->
+        <div class="flex flex-col sm:flex-row items-center justify-center bg-slate-950/80 p-4 rounded-2xl border border-slate-800 gap-4">
+          <!-- Kotak Paparan QR Code -->
+          <div id="qrcode" class="bg-white p-2 rounded-xl shadow-md flex items-center justify-center"></div>
+
+          <!-- Pautan & Butang Buka -->
+          <div class="flex flex-col items-center sm:items-start gap-2">
+            <button id="mainFolderBtn" onclick="openSelectedFolder()" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs sm:text-sm rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer z-30">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+              Buka Folder Fail
+            </button>
+            
+            <input id="mainLinkInput" type="text" readonly onclick="this.select()" class="bg-slate-900 text-[11px] text-slate-300 font-mono px-3 py-1.5 rounded-lg border border-slate-700/80 w-full max-w-[220px] text-center select-all cursor-pointer" value="--">
+          </div>
         </div>
       </div>
 
@@ -335,6 +343,7 @@
       const winnerNameEl = document.getElementById('currentWinnerName');
       const winnerFileNoEl = document.getElementById('currentWinnerFileNo');
       const mainLinkInput = document.getElementById('mainLinkInput');
+      const qrContainer = document.getElementById('qrcode');
 
       slotBadge.innerText = `Sedang Mencabut No. Fail`;
       statusText.innerText = `Menyaring pangkalan data Google Sheets...`;
@@ -472,6 +481,17 @@
             
             currentActiveFolderUrl = targetUrl;
             mainLinkInput.value = targetUrl;
+
+            // Jana QR Code secara automatik berdasarkan URL terpilih
+            qrContainer.innerHTML = "";
+            new QRCode(qrContainer, {
+              text: targetUrl,
+              width: 90,
+              height: 90,
+              colorDark: "#000000",
+              colorLight: "#ffffff",
+              correctLevel: QRCode.CorrectLevel.H
+            });
             
             winnerBox.classList.remove('opacity-0');
 
