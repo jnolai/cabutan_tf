@@ -127,47 +127,15 @@
   <script>
     const SPREADSHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1MUMz7nyfsWFFg9DUkQC6D19EJ7-DweFgHUa98-67Qxs/gviz/tq?tqx=out:csv';
     
-    // Gantikan URL di bawah dengan "Web App URL" yang anda dapat dari Google Apps Script Deployment
-    const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzXHYfd9QR1XKjRwMKsyUp9U7-LG4L8oLvCzxneaEbALoojJgimokyD74wLrqjGH2EmaA/exec';
+    // Web App URL Google Apps Script
+    const APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwZrgNEv-Aw4RuSpP95he5KiPw-to7PUaa5PNRjqDRbypt9uFKXIRa5PhcvZ9KIivW7Kw/exec';
 
-    let fileRecords = [];
-    const fileMap = new Map();
-    const drawnWinnersSet = new Set();
     let isDrawing = false;
     let audioCtx = null;
     let currentActiveFolderUrl = '';
 
-    function handleDrawClick() {
-      if (fileRecords.length === 0) {
-        alert("Pangkalan data Google Sheets sedang dimuatkan atau semua fail telah habis dicabut.");
-        return;
-      }
-      startDrawFlow();
-    }
-
-    function openSelectedFolder() {
-      if (currentActiveFolderUrl && currentActiveFolderUrl.startsWith('http')) {
-        window.open(currentActiveFolderUrl, '_blank');
-      } else {
-        alert("Pautan Google Drive bagi fail ini tidak ditemui.");
-      }
-    }
-
-    // Fungsi menghantar rekod ke Google Sheets supaya ditanda
-    async function markFileAsDrawnInSheet(fileNo) {
-      if (!APPS_SCRIPT_WEB_APP_URL || APPS_SCRIPT_WEB_APP_URL.includes('PAKAN_WEB')) return;
-      try {
-        await fetch(`${APPS_SCRIPT_WEB_APP_URL}?action=update&fileno=${encodeURIComponent(fileNo)}`, {
-          method: 'GET',
-          mode: 'no-cors'
-        });
-      } catch (err) {
-        console.warn("Gagal mengemaskini Google Sheet secara langsung:", err);
-      }
-    }
-
-    // Muat data Google Sheets
-    async function loadGoogleSheetsData() {
+    // Semak status pangkalan data awal
+    async function checkDatabaseStatus() {
       const badge = document.getElementById('sheetStatusBadge');
       try {
         const response = await fetch(SPREADSHEET_CSV_URL);
@@ -178,45 +146,86 @@
           skipEmptyLines: true,
           complete: function(results) {
             const data = results.data;
-            fileRecords = [];
-            fileMap.clear();
+            let activeCount = 0;
 
-            data.forEach((row, idx) => {
+            data.forEach((row) => {
               if (!row || row.length < 2) return;
-              
               const folderName = String(row[0]).trim();
-              const linkUrl = String(row[1]).trim().replace(/[\r\n\t]/g, '');
+              const linkUrl = String(row[1]).trim();
               const statusCol = row[2] ? String(row[2]).trim() : '';
 
-              // Masukkan hanya jika belum dicabut (Lajur C bukan "TELAH DICABUT")
               if (folderName && folderName.toLowerCase() !== 'nama folder' && linkUrl.length > 0) {
                 if (statusCol.toUpperCase() !== 'TELAH DICABUT') {
-                  fileRecords.push(folderName);
-                  fileMap.set(folderName, linkUrl);
-                } else {
-                  drawnWinnersSet.add(folderName); // Masukkan dalam senarai elak pilih
+                  activeCount++;
                 }
               }
             });
 
-            // Status Pangkalan Data Aktiviti
-            if (fileRecords.length > 0) {
-              badge.innerText = "PANGKALAN DATA AKTIF";
+            if (activeCount > 0) {
+              badge.innerText = `PANGKALAN DATA AKTIF (${activeCount} FAIL SAH)`;
               badge.className = "px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30";
             } else {
-              badge.innerText = "PANGKALAN DATA TIDAK AKTIF";
+              badge.innerText = "SEMUA FAIL TELAH DICABUT";
               badge.className = "px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase bg-red-500/10 text-red-400 border border-red-500/30";
             }
           }
         });
       } catch (err) {
-        console.warn("Gagal memuatkan Google Sheets:", err);
+        console.warn("Gagal menyemak Google Sheets:", err);
         badge.innerText = "PANGKALAN DATA TIDAK AKTIF";
         badge.className = "px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase bg-red-500/10 text-red-400 border border-red-500/30";
       }
     }
 
-    loadGoogleSheetsData();
+    checkDatabaseStatus();
+
+    async function handleDrawClick() {
+      if (isDrawing) return;
+
+      const btnDraw = document.getElementById('btnDraw');
+      const statusText = document.getElementById('statusText');
+      
+      btnDraw.disabled = true;
+      btnDraw.classList.add('opacity-50', 'cursor-not-allowed');
+      statusText.innerText = "Menghubungi Server...";
+
+      try {
+        // Minta nombor fail yang telah dikunci secara selamat dari Apps Script
+        const res = await fetch(`${APPS_SCRIPT_WEB_APP_URL}?action=draw`);
+        const result = await res.json();
+
+        if (!result.success) {
+          alert(result.message || "Gagal mendapatkan nombor fail.");
+          btnDraw.disabled = false;
+          btnDraw.classList.remove('opacity-50', 'cursor-not-allowed');
+          statusText.innerText = "Tekan butang CABUTAN untuk memulakan sesi";
+          checkDatabaseStatus();
+          return;
+        }
+
+        // Jalankan animasi dengan nombor sah yang sudah siap dikunci di server
+        startDrawFlow(result.fileNo, result.url, () => {
+          btnDraw.disabled = false;
+          btnDraw.classList.remove('opacity-50', 'cursor-not-allowed');
+          checkDatabaseStatus();
+        });
+
+      } catch (err) {
+        console.error("Ralat komunikasi server:", err);
+        alert("Ralat semasa berhubung dengan Apps Script. Sila cuba lagi.");
+        btnDraw.disabled = false;
+        btnDraw.classList.remove('opacity-50', 'cursor-not-allowed');
+        statusText.innerText = "Tekan butang CABUTAN untuk memulakan sesi";
+      }
+    }
+
+    function openSelectedFolder() {
+      if (currentActiveFolderUrl && currentActiveFolderUrl.startsWith('http')) {
+        window.open(currentActiveFolderUrl, '_blank');
+      } else {
+        alert("Pautan Google Drive bagi fail ini tidak ditemui.");
+      }
+    }
 
     function getAudioContext() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -352,22 +361,9 @@
       } catch (e) {}
     }
 
-    function startDrawFlow() {
-      if (isDrawing || fileRecords.length === 0) return;
+    function startDrawFlow(targetFileNo, targetUrl, onComplete) {
       isDrawing = true;
 
-      const btnDraw = document.getElementById('btnDraw');
-      btnDraw.disabled = true;
-      btnDraw.classList.add('opacity-50', 'cursor-not-allowed');
-
-      executeSuspenseDrawForSlot(() => {
-        btnDraw.disabled = false;
-        btnDraw.classList.remove('opacity-50', 'cursor-not-allowed');
-        isDrawing = false;
-      });
-    }
-
-    function executeSuspenseDrawForSlot(onComplete) {
       const board = document.getElementById('boardContainer');
       const overlay = document.getElementById('suspenseOverlay');
       const slotBadge = document.getElementById('slotBadge');
@@ -379,22 +375,10 @@
       const qrContainer = document.getElementById('qrcode');
 
       slotBadge.innerText = `Sedang Mencabut No. Fail`;
-      statusText.innerText = `Menyaring pangkalan data Google Sheets...`;
+      statusText.innerText = `Memutus & mengunci digit cabutan...`;
       winnerBox.classList.add('opacity-0');
       board.classList.add('heartbeat-box', 'border-red-500/80');
       overlay.classList.add('opacity-100');
-
-      // Pilih rawak daripada senarai fail aktif
-      const randomIndex = Math.floor(Math.random() * fileRecords.length);
-      const targetFileNo = fileRecords[randomIndex];
-      const targetUrl = fileMap.get(targetFileNo) || '';
-      
-      // Buang fail ini dari senarai aktif tempatan supaya tidak dipilih lagi dalam sesi sama
-      fileRecords.splice(randomIndex, 1);
-      drawnWinnersSet.add(targetFileNo);
-
-      // Hantar arahan kemas kini ke Google Sheets secara latar belakang
-      markFileAsDrawnInSheet(targetFileNo);
 
       const targetChars = targetFileNo.padEnd(5, ' ').split('');
 
@@ -443,7 +427,7 @@
       }
       runInitialFinalSpin();
 
-      const lockDelays = [800, 1800, 2800, 3800];
+      const lockDelays = [800, 1800, 2800, 2800];
 
       for (let idx = 0; idx < 4; idx++) {
         setTimeout(() => {
@@ -467,7 +451,7 @@
           } else if (idx === 3) {
             digitEls[3].classList.remove('ultra-glow');
             playLockSound('semi-final');
-            statusText.innerText = "DETIK MENDENGKANG: Angka Terakhir Sedang Berputar Super Slow...";
+            statusText.innerText = "DETIK MENDEBARKAN: Angka Terakhir Sedang Berputar Super Slow...";
             
             finalDigitActive = false;
             startUltraSlowFinalSequence();
@@ -479,7 +463,7 @@
         finalEl.classList.remove('blur-motion', 'ultra-glow');
         finalEl.classList.add('solo-final-active', 'text-amber-300');
 
-        const slowDelays = [90, 110, 140, 180, 230, 290, 360, 440, 530, 640, 700];
+        const slowDelays = [90, 110, 140, 180, 230, 290, 360, 440];
         let stepIndex = 0;
 
         function stepSlowRoll() {
@@ -535,6 +519,7 @@
               origin: { y: 0.65 } 
             });
 
+            isDrawing = false;
             if (onComplete) onComplete();
           }
         }
